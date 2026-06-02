@@ -1,8 +1,6 @@
 
   # Super Admin Panel
 
-  This is a code bundle for Super Admin Panel. The original project is available at https://www.figma.com/design/XBo67UmHvpTb4yeWKHq3zQ/Super-Admin-Panel.
-
   ## Running the code
 
   Run `npm i` to install the dependencies.

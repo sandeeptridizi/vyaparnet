@@ -15,7 +15,6 @@ const ACCENT = "#3845AB";
 const ORANGE = "#EEA86C";
 const SCREEN_BG = "#FEF4EE";
 
-// ─── Mock Data (Indian context) ──────────────────────────────────────────────
 
 const revenueData = [
   { month: "Aug", revenue: 3200000, expenses: 1100000 },
@@ -58,7 +57,6 @@ const users = [
   { id: 8, name: "Kavya Mishra", email: "kavya.m@gmail.com", city: "Lucknow", role: "Buyer", status: "Active", joined: "9 Mar 2024", listings: 0, spend: "₹21,300", subscription: "—" },
 ];
 
-// Products published by users via subscription
 const publishedProducts = [
   {
     id: 1,
@@ -200,7 +198,6 @@ const promotions = [
   { id: 4, title: "Subscription Renewal Reminder", type: "Notification", placement: "Global", status: "Draft", impressions: "—", clicks: "—", startDate: "1 Jun 2026", endDate: "31 Aug 2026" },
 ];
 
-// ─── Components ──────────────────────────────────────────────────────────────
 
 const Badge = ({ status }: { status: string }) => {
   const map: Record<string, string> = {
@@ -266,24 +263,20 @@ function CustomAreaChart({ data }: { data: typeof revenueData }) {
           const idx = Math.min(data.length - 1, Math.max(0, Math.round((mx - PL) / (cW / (data.length - 1)))));
           setTooltip({ x: xScale(idx), y: yScale(data[idx].revenue), idx });
         }}>
-        {/* grid */}
         {yTicks.map(t => (
           <g key={t}>
             <line x1={PL} x2={PL + cW} y1={yScale(t)} y2={yScale(t)} stroke="rgba(51,44,90,0.07)" strokeDasharray="3 3" />
             <text x={PL - 6} y={yScale(t) + 4} textAnchor="end" fontSize={10} fill="#7a6e8a">₹{(t / 100000).toFixed(0)}L</text>
           </g>
         ))}
-        {/* x labels */}
+
         {data.map((d, i) => (
           <text key={d.month} x={xScale(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="#7a6e8a">{d.month}</text>
         ))}
-        {/* areas */}
         <path d={makeArea("expenses")} fill={ORANGE} fillOpacity={0.1} />
         <path d={makeArea("revenue")} fill={ACCENT} fillOpacity={0.12} />
-        {/* lines */}
         <path d={makePath("expenses")} fill="none" stroke={ORANGE} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         <path d={makePath("revenue")} fill="none" stroke={ACCENT} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        {/* tooltip */}
         {tooltip && (
           <>
             <line x1={tooltip.x} x2={tooltip.x} y1={PT} y2={PT + cH} stroke="rgba(51,44,90,0.15)" strokeWidth={1} strokeDasharray="4 2" />
@@ -383,7 +376,6 @@ function CustomDonutChart({ data }: { data: typeof categoryData }) {
   );
 }
 
-// ─── Pages ───────────────────────────────────────────────────────────────────
 
 function DashboardPage() {
   return (
@@ -550,7 +542,6 @@ function UserManagementPage() {
         </div>
       </div>
 
-      {/* Add User Modal */}
       {addingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -600,7 +591,6 @@ function UserManagementPage() {
         </div>
       )}
 
-      {/* View User Modal */}
       {viewingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -638,7 +628,6 @@ function UserManagementPage() {
         </div>
       )}
 
-      {/* Edit User Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -685,7 +674,6 @@ function UserManagementPage() {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
       {deletingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -737,7 +725,6 @@ function ProductManagementPage() {
         </div>
       </div>
 
-      {/* Token info banner */}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -839,7 +826,6 @@ function ProductManagementPage() {
           </table>
         </div>
       </div>
-      {/* View Product Modal */}
       {viewingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -871,7 +857,6 @@ function ProductManagementPage() {
         </div>
       )}
 
-      {/* Edit Product Modal */}
       {editingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -911,7 +896,6 @@ function ProductManagementPage() {
         </div>
       )}
 
-      {/* Delete Product Modal */}
       {deletingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -973,9 +957,7 @@ function FinancialPage({ sub }: { sub: string }) {
 
       {activeSub === "subscriptions" && (
         <div className="space-y-5">
-          {/* Plan cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Monthly Plan */}
             <div className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)] overflow-hidden">
               <div className="px-5 py-4 flex items-center justify-between" style={{ background: "rgba(238,168,108,0.08)", borderBottom: "1px solid rgba(238,168,108,0.2)" }}>
                 <div>
@@ -995,7 +977,6 @@ function FinancialPage({ sub }: { sub: string }) {
               </div>
             </div>
 
-            {/* Annual Plan */}
             <div className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)] overflow-hidden">
               <div className="px-5 py-4 flex items-center justify-between" style={{ background: "#F0F2FF", borderBottom: "1px solid rgba(56,69,171,0.15)" }}>
                 <div>
@@ -1019,7 +1000,6 @@ function FinancialPage({ sub }: { sub: string }) {
             </div>
           </div>
 
-          {/* Edit Plan Modal */}
           {editingPlan && (
             <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -1061,7 +1041,6 @@ function FinancialPage({ sub }: { sub: string }) {
             </div>
           )}
 
-          {/* Subscriber list */}
           <div className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)]">
             <div className="px-5 py-4 border-b border-[rgba(51,44,90,0.07)] flex items-center justify-between">
               <h3 className="font-bold text-[#1a1530]">Recent Subscriptions</h3>
@@ -1201,7 +1180,6 @@ function FinancialPage({ sub }: { sub: string }) {
         </div>
       )}
 
-      {/* Create Coupon Modal */}
       {addingCoupon && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -1392,7 +1370,6 @@ function PromotionsPage() {
         ))}
       </div>
 
-      {/* Edit Promotion Modal */}
       {editingPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
@@ -1446,7 +1423,6 @@ function PromotionsPage() {
         </div>
       )}
 
-      {/* Delete Promotion Modal */}
       {deletingPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
@@ -1530,7 +1506,6 @@ function SettingsPage() {
   );
 }
 
-// ─── Nav ─────────────────────────────────────────────────────────────────────
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -1548,7 +1523,6 @@ const navItems = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
 
 function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");

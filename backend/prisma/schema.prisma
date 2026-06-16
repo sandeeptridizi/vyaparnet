@@ -62,3 +62,31 @@ model Admin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Settings {
+  id              String  @id @default("global")
+  appName         String  @default("VyaparNet") @db.VarChar(100)
+  supportEmail    String  @default("support@vyaparnet.in") @db.VarChar(200)
+  defaultCurrency String  @default("INR") @db.VarChar(10)
+  emailNotif      Boolean @default(true)
+  pushNotif       Boolean @default(false)
+  twoFactor       Boolean @default(true)
+  maintenanceMode Boolean @default(false)
+  autoBackup      Boolean @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+model Promotion {
+  id          String   @id @default(uuid())
+  title       String   @db.VarChar(200)
+  type        String   @db.VarChar(50)
+  placement   String   @db.VarChar(50)
+  status      String   @default("Draft") @db.VarChar(20)
+  imageUrl    String?
+  startDate   DateTime
+  endDate     DateTime
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

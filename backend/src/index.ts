@@ -9,6 +9,9 @@ import authRoutes from "@/routes/auth.routes";
 import businessRoutes from "@/routes/business.routes";
 import adminAuthRoutes from "@/routes/admin/auth.routes";
 import adminUsersRoutes from "@/routes/admin/users.routes";
+import adminPromotionsRoutes from "@/routes/admin/promotions.routes";
+import adminSettingsRoutes from "@/routes/admin/settings.routes";
+import appPromotionsRoutes from "@/routes/app/promotions.routes";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -24,6 +27,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/business", businessRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
+app.use("/api/admin/promotions", adminPromotionsRoutes);
+app.use("/api/admin/settings", adminSettingsRoutes);
+app.use("/api/promotions", appPromotionsRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ success: false, message: "Route not found" });

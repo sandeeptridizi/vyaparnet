@@ -39,6 +39,23 @@ type AppUser = {
   category?: string;
 };
 
+type Promotion = {
+  id: string;
+  title: string;
+  type: string;
+  placement: string;
+  status: string;
+  imageUrl: string | null;
+  startDate: string;
+  endDate: string;
+  impressions: number;
+  clicks: number;
+};
+
+const toInputDate = (iso: string) => iso.slice(0, 10);
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
 
 const revenueData = [
   { month: "Aug", revenue: 3200000, expenses: 1100000 },
@@ -215,12 +232,6 @@ const coupons = [
   { code: "HOLI50", discount: "50% off", type: "Percentage", usage: "500 / 500", expires: "26 Mar 2026", status: "Expired" },
 ];
 
-const promotions = [
-  { id: 1, title: "Monsoon Mega Sale Banner", type: "Banner", placement: "Home", status: "Live", impressions: "2,48,120", clicks: "32,914", startDate: "1 Jun 2026", endDate: "31 Aug 2026" },
-  { id: 2, title: "New Arrivals Carousel", type: "Carousel", placement: "Category", status: "Live", impressions: "1,12,040", clicks: "18,503", startDate: "15 May 2026", endDate: "15 Jul 2026" },
-  { id: 3, title: "App-Only Deal Pop-up", type: "Pop-up", placement: "Checkout", status: "Paused", impressions: "74,300", clicks: "8,921", startDate: "20 Apr 2026", endDate: "20 Jun 2026" },
-  { id: 4, title: "Subscription Renewal Reminder", type: "Notification", placement: "Global", status: "Draft", impressions: "—", clicks: "—", startDate: "1 Jun 2026", endDate: "31 Aug 2026" },
-];
 
 
 const Badge = ({ status }: { status: string }) => {
@@ -1286,10 +1297,62 @@ function FinancialPage({ sub }: { sub: string }) {
 function PromotionsPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [draft, setDraft] = useState({ title: "", type: "Banner", placement: "Home", startDate: "", endDate: "" });
-  const [promotionsData, setPromotionsData] = useState(promotions);
-  const [editingPromo, setEditingPromo] = useState<typeof promotions[0] | null>(null);
-  const [editDraft, setEditDraft] = useState({ title: "", type: "Banner", placement: "Home", startDate: "", endDate: "" });
-  const [deletingPromo, setDeletingPromo] = useState<typeof promotions[0] | null>(null);
+  const [promotionsData, setPromotionsData] = useState<Promotion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+  const [editDraft, setEditDraft] = useState({ title: "", type: "Banner", placement: "Home", status: "Draft", startDate: "", endDate: "" });
+  const [deletingPromo, setDeletingPromo] = useState<Promotion | null>(null);
+
+  const fetchPromotions = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/promotions`, { headers: authHeaders() });
+      const json = await res.json();
+      if (json.success) setPromotionsData(json.data);
+    } catch (e) {
+      console.error("[fetchPromotions]", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPromotions(); }, []);
+
+  const handleCreate = async () => {
+    if (!draft.title) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/promotions`, {
+        method: "POST", headers: authHeaders(), body: JSON.stringify(draft),
+      });
+      const json = await res.json();
+      if (json.success) { setPromotionsData(prev => [json.data, ...prev]); setShowNewModal(false); }
+    } catch (e) { console.error(e); } finally { setSaving(false); }
+  };
+
+  const handleUpdate = async () => {
+    if (!editingPromo) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/promotions/${editingPromo.id}`, {
+        method: "PUT", headers: authHeaders(), body: JSON.stringify(editDraft),
+      });
+      const json = await res.json();
+      if (json.success) { setPromotionsData(prev => prev.map(x => x.id === editingPromo.id ? json.data : x)); setEditingPromo(null); }
+    } catch (e) { console.error(e); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingPromo) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/promotions/${deletingPromo.id}`, {
+        method: "DELETE", headers: authHeaders(),
+      });
+      const json = await res.json();
+      if (json.success) { setPromotionsData(prev => prev.filter(x => x.id !== deletingPromo.id)); setDeletingPromo(null); }
+    } catch (e) { console.error(e); } finally { setSaving(false); }
+  };
 
   return (
     <div className="space-y-6">
@@ -1362,59 +1425,66 @@ function PromotionsPage() {
                 className="flex-1 px-4 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] text-sm font-medium text-[#7a6e8a] hover:bg-[#f5ebe2] transition-colors">
                 Cancel
               </button>
-              <button onClick={() => setShowNewModal(false)} disabled={!draft.title}
-                className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
+              <button onClick={handleCreate} disabled={!draft.title || saving}
+                className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
                 style={{ background: ORANGE }}>
-                Create Promotion
+                {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {saving ? "Creating..." : "Create Promotion"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-
-      <div className="grid gap-4">
-        {promotionsData.map(p => (
-          <div key={p.id} className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)] p-5 hover:shadow-sm transition-shadow">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#F0F2FF" }}>
-                  <ImageIcon size={20} color={ACCENT} />
+      {loading ? (
+        <div className="text-center py-16 text-[#7a6e8a] text-sm">Loading promotions...</div>
+      ) : promotionsData.length === 0 ? (
+        <div className="text-center py-16 text-[#7a6e8a] text-sm">No promotions yet. Click <strong>+ New Promotion</strong> to create one.</div>
+      ) : (
+        <div className="grid gap-4">
+          {promotionsData.map(p => (
+            <div key={p.id} className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)] p-5 hover:shadow-sm transition-shadow">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#F0F2FF" }}>
+                    <ImageIcon size={20} color={ACCENT} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-[#1a1530]">{p.title}</h3>
+                      <Badge status={p.status} />
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-[#7a6e8a]">
+                      <span>{p.type}</span>
+                      <span className="w-1 h-1 rounded-full bg-[#7a6e8a]" />
+                      <span>Placement: {p.placement}</span>
+                      <span className="w-1 h-1 rounded-full bg-[#7a6e8a]" />
+                      <span>{fmtDate(p.startDate)} → {fmtDate(p.endDate)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-[#1a1530]">{p.title}</h3>
-                    <Badge status={p.status} />
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-[#7a6e8a]">
-                    <span>{p.type}</span>
-                    <span className="w-1 h-1 rounded-full bg-[#7a6e8a]" />
-                    <span>Placement: {p.placement}</span>
-                    <span className="w-1 h-1 rounded-full bg-[#7a6e8a]" />
-                    <span>{p.startDate} → {p.endDate}</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button className="p-1.5 rounded-lg hover:bg-[#F0F2FF]" onClick={() => {
+                    setEditingPromo(p);
+                    setEditDraft({ title: p.title, type: p.type, placement: p.placement, status: p.status, startDate: toInputDate(p.startDate), endDate: toInputDate(p.endDate) });
+                  }}><Edit2 size={14} color={ACCENT} /></button>
+                  <button className="p-1.5 rounded-lg hover:bg-red-50" onClick={() => setDeletingPromo(p)}><Trash2 size={14} color="#d4183d" /></button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="p-1.5 rounded-lg hover:bg-[#F0F2FF]" onClick={() => { setEditingPromo(p); setEditDraft({ title: p.title, type: p.type, placement: p.placement, startDate: p.startDate, endDate: p.endDate }); }}><Edit2 size={14} color={ACCENT} /></button>
-                <button className="p-1.5 rounded-lg hover:bg-red-50" onClick={() => setDeletingPromo(p)}><Trash2 size={14} color="#d4183d" /></button>
-              </div>
+              {p.impressions > 0 && (
+                <div className="mt-4 pt-4 border-t border-[rgba(51,44,90,0.07)] grid grid-cols-3 gap-4">
+                  <div><p className="text-xs text-[#7a6e8a] mb-0.5">Impressions</p><p className="font-bold text-[#1a1530]">{p.impressions.toLocaleString("en-IN")}</p></div>
+                  <div><p className="text-xs text-[#7a6e8a] mb-0.5">Clicks</p><p className="font-bold text-[#1a1530]">{p.clicks.toLocaleString("en-IN")}</p></div>
+                  <div>
+                    <p className="text-xs text-[#7a6e8a] mb-0.5">CTR</p>
+                    <p className="font-bold text-[#1a1530]">{((p.clicks / p.impressions) * 100).toFixed(1)}%</p>
+                  </div>
+                </div>
+              )}
             </div>
-            {p.impressions !== "—" && (
-              <div className="mt-4 pt-4 border-t border-[rgba(51,44,90,0.07)] grid grid-cols-3 gap-4">
-                <div><p className="text-xs text-[#7a6e8a] mb-0.5">Impressions</p><p className="font-bold text-[#1a1530]">{p.impressions}</p></div>
-                <div><p className="text-xs text-[#7a6e8a] mb-0.5">Clicks</p><p className="font-bold text-[#1a1530]">{p.clicks}</p></div>
-                <div>
-                  <p className="text-xs text-[#7a6e8a] mb-0.5">CTR</p>
-                  <p className="font-bold text-[#1a1530]">
-                    {`${((parseInt(p.clicks.replace(/,/g, "")) / parseInt(p.impressions.replace(/,/g, ""))) * 100).toFixed(1)}%`}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {editingPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(26,21,48,0.4)" }}>
@@ -1441,29 +1511,36 @@ function PromotionsPage() {
                   <label className="text-sm font-medium text-[#1a1530] block mb-1.5">Placement</label>
                   <select value={editDraft.placement} onChange={e => setEditDraft(d => ({ ...d, placement: e.target.value }))}
                     className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none">
-                    {["Home", "Category", "Checkout", "Global"].map(p => <option key={p}>{p}</option>)}
+                    {["Home", "Category", "Checkout", "Global"].map(pl => <option key={pl}>{pl}</option>)}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#1a1530] block mb-1.5">Status</label>
+                <select value={editDraft.status} onChange={e => setEditDraft(d => ({ ...d, status: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none">
+                  {["Draft", "Live", "Paused"].map(s => <option key={s}>{s}</option>)}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-[#1a1530] block mb-1.5">Start Date</label>
-                  <input value={editDraft.startDate} onChange={e => setEditDraft(d => ({ ...d, startDate: e.target.value }))}
+                  <input type="date" value={editDraft.startDate} onChange={e => setEditDraft(d => ({ ...d, startDate: e.target.value }))}
                     className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-[#1a1530] block mb-1.5">End Date</label>
-                  <input value={editDraft.endDate} onChange={e => setEditDraft(d => ({ ...d, endDate: e.target.value }))}
+                  <input type="date" value={editDraft.endDate} onChange={e => setEditDraft(d => ({ ...d, endDate: e.target.value }))}
                     className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none" />
                 </div>
               </div>
             </div>
             <div className="px-6 pb-5 flex gap-3">
               <button onClick={() => setEditingPromo(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] text-sm font-medium text-[#7a6e8a] hover:bg-[#f5ebe2]">Cancel</button>
-              <button onClick={() => {
-                setPromotionsData(prev => prev.map(x => x.id === editingPromo.id ? { ...x, ...editDraft } : x));
-                setEditingPromo(null);
-              }} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{ background: ORANGE }}>Save Changes</button>
+              <button onClick={handleUpdate} disabled={saving} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2" style={{ background: ORANGE }}>
+                {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
             </div>
           </div>
         </div>
@@ -1479,10 +1556,10 @@ function PromotionsPage() {
             </div>
             <div className="px-6 pb-5 flex gap-3">
               <button onClick={() => setDeletingPromo(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] text-sm font-medium text-[#7a6e8a] hover:bg-[#f5ebe2]">Cancel</button>
-              <button onClick={() => {
-                setPromotionsData(prev => prev.filter(x => x.id !== deletingPromo.id));
-                setDeletingPromo(null);
-              }} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{ background: "#d4183d" }}>Delete</button>
+              <button onClick={handleDelete} disabled={saving} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2" style={{ background: "#d4183d" }}>
+                {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {saving ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
         </div>
@@ -1491,9 +1568,72 @@ function PromotionsPage() {
   );
 }
 
+const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED"];
+const CURRENCY_LABELS: Record<string, string> = { INR: "INR — Indian Rupee", USD: "USD — US Dollar", EUR: "EUR — Euro", GBP: "GBP — British Pound", AED: "AED — UAE Dirham" };
+
+type AppSettings = {
+  appName: string; supportEmail: string; defaultCurrency: string;
+  emailNotif: boolean; pushNotif: boolean; twoFactor: boolean;
+  maintenanceMode: boolean; autoBackup: boolean;
+};
+
+const DEFAULT_SETTINGS: AppSettings = {
+  appName: "VyaparNet", supportEmail: "support@vyaparnet.in", defaultCurrency: "INR",
+  emailNotif: true, pushNotif: false, twoFactor: true, maintenanceMode: false, autoBackup: true,
+};
+
 function SettingsPage() {
-  const [toggles, setToggles] = useState({ emailNotif: true, pushNotif: false, twoFactor: true, maintenanceMode: false, autoBackup: true });
-  const toggle = (k: keyof typeof toggles) => setToggles(p => ({ ...p, [k]: !p[k] }));
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [original, setOriginal] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/admin/settings`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(json => { if (json.success) { setSettings(json.data); setOriginal(json.data); } })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) =>
+    setSettings(p => ({ ...p, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/settings`, {
+        method: "PUT", headers: authHeaders(), body: JSON.stringify(settings),
+      });
+      const json = await res.json();
+      if (json.success) setOriginal(json.data);
+    } catch (e) { console.error(e); } finally { setSaving(false); }
+  };
+
+  const handleDiscard = () => setSettings(original);
+
+  const ToggleBtn = ({ k }: { k: keyof AppSettings }) => (
+    <button onClick={() => set(k, !settings[k] as AppSettings[typeof k])}
+      className="relative w-11 h-6 rounded-full transition-all shrink-0"
+      style={{ background: settings[k] ? ACCENT : "#d1d5db" }}>
+      <span className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
+        style={{ left: settings[k] ? "calc(100% - 20px)" : "4px" }} />
+    </button>
+  );
+
+  const Row = ({ label, sub, children }: { label: string; sub: string; children: React.ReactNode }) => (
+    <div className="px-5 py-4 flex items-center justify-between gap-6">
+      <div className="flex-1">
+        <p className="font-semibold text-sm text-[#1a1530]">{label}</p>
+        <p className="text-xs text-[#7a6e8a] mt-0.5">{sub}</p>
+      </div>
+      {children}
+    </div>
+  );
+
+  const inputCls = "w-64 px-3 py-2 rounded-xl border border-[rgba(51,44,90,0.12)] text-sm text-[#1a1530] bg-[#faf6f2] outline-none focus:border-[#3845AB] transition-colors";
+
+  if (loading) return <div className="text-center py-16 text-[#7a6e8a] text-sm">Loading settings...</div>;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -1502,51 +1642,61 @@ function SettingsPage() {
         <p className="text-sm text-[#7a6e8a] mt-0.5">Configure application preferences</p>
       </div>
 
-      {[
-        {
-          title: "General", icon: <Globe size={16} color={ACCENT} />, items: [
-            { label: "App Name", sub: "Display name for your application", type: "input", value: "VyaparNet" },
-            { label: "Support Email", sub: "Contact address shown to users", type: "input", value: "support@vyaparnet.in" },
-            { label: "Default Currency", sub: "Currency used for all transactions", type: "select", value: "INR — Indian Rupee" },
-          ]
-        },
-      ].map(section => (
-        <div key={section.title} className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)]">
-          <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[rgba(51,44,90,0.07)]">
-            <div className="p-2 rounded-lg" style={{ background: "#F0F2FF" }}>{section.icon}</div>
-            <h3 className="font-bold text-[#1a1530]">{section.title}</h3>
-          </div>
-          <div className="divide-y divide-[rgba(51,44,90,0.06)]">
-            {section.items.map((item: any) => (
-              <div key={item.label} className="px-5 py-4 flex items-center justify-between gap-6">
-                <div className="flex-1">
-                  <p className="font-semibold text-sm text-[#1a1530]">{item.label}</p>
-                  <p className="text-xs text-[#7a6e8a] mt-0.5">{item.sub}</p>
-                </div>
-                {item.type === "toggle" && (
-                  <button onClick={() => toggle(item.key)} className="relative w-11 h-6 rounded-full transition-all shrink-0" style={{ background: toggles[item.key as keyof typeof toggles] ? ACCENT : "#d1d5db" }}>
-                    <span className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: toggles[item.key as keyof typeof toggles] ? "calc(100% - 20px)" : "4px" }} />
-                  </button>
-                )}
-                {item.type === "input" && (
-                  <input defaultValue={item.value} className="w-64 px-3 py-2 rounded-xl border border-[rgba(51,44,90,0.12)] text-sm text-[#1a1530] bg-[#faf6f2] outline-none focus:border-[#3845AB] transition-colors" />
-                )}
-                {item.type === "select" && (
-                  <select className="w-52 px-3 py-2 rounded-xl border border-[rgba(51,44,90,0.12)] text-sm text-[#1a1530] bg-[#faf6f2] outline-none">
-                    <option>INR — Indian Rupee</option>
-                    <option>USD — US Dollar</option>
-                    <option>EUR — Euro</option>
-                  </select>
-                )}
-              </div>
-            ))}
-          </div>
+      <div className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)]">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[rgba(51,44,90,0.07)]">
+          <div className="p-2 rounded-lg" style={{ background: "#F0F2FF" }}><Globe size={16} color={ACCENT} /></div>
+          <h3 className="font-bold text-[#1a1530]">General</h3>
         </div>
-      ))}
+        <div className="divide-y divide-[rgba(51,44,90,0.06)]">
+          <Row label="App Name" sub="Display name for your application">
+            <input value={settings.appName} onChange={e => set("appName", e.target.value)} className={inputCls} />
+          </Row>
+          <Row label="Support Email" sub="Contact address shown to users">
+            <input value={settings.supportEmail} onChange={e => set("supportEmail", e.target.value)} className={inputCls} />
+          </Row>
+          <Row label="Default Currency" sub="Currency used for all transactions">
+            <select value={settings.defaultCurrency} onChange={e => set("defaultCurrency", e.target.value)}
+              className="w-52 px-3 py-2 rounded-xl border border-[rgba(51,44,90,0.12)] text-sm text-[#1a1530] bg-[#faf6f2] outline-none">
+              {CURRENCIES.map(c => <option key={c} value={c}>{CURRENCY_LABELS[c]}</option>)}
+            </select>
+          </Row>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)]">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[rgba(51,44,90,0.07)]">
+          <div className="p-2 rounded-lg" style={{ background: "#F0F2FF" }}><Bell size={16} color={ACCENT} /></div>
+          <h3 className="font-bold text-[#1a1530]">Notifications</h3>
+        </div>
+        <div className="divide-y divide-[rgba(51,44,90,0.06)]">
+          <Row label="Email Notifications" sub="Send email alerts for key events"><ToggleBtn k="emailNotif" /></Row>
+          <Row label="Push Notifications" sub="Send push alerts to mobile users"><ToggleBtn k="pushNotif" /></Row>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-[rgba(51,44,90,0.08)]">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[rgba(51,44,90,0.07)]">
+          <div className="p-2 rounded-lg" style={{ background: "#F0F2FF" }}><Lock size={16} color={ACCENT} /></div>
+          <h3 className="font-bold text-[#1a1530]">Security & System</h3>
+        </div>
+        <div className="divide-y divide-[rgba(51,44,90,0.06)]">
+          <Row label="Two-Factor Authentication" sub="Require 2FA for admin logins"><ToggleBtn k="twoFactor" /></Row>
+          <Row label="Maintenance Mode" sub="Take the app offline for users"><ToggleBtn k="maintenanceMode" /></Row>
+          <Row label="Auto Backup" sub="Automatically back up data daily"><ToggleBtn k="autoBackup" /></Row>
+        </div>
+      </div>
 
       <div className="flex gap-3">
-        <button className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{ background: ORANGE }}>Save Changes</button>
-        <button className="px-6 py-2.5 rounded-xl text-sm font-semibold border border-[rgba(51,44,90,0.12)] text-[#7a6e8a] hover:bg-white transition-colors">Discard</button>
+        <button onClick={handleSave} disabled={saving}
+          className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 flex items-center gap-2 transition-opacity"
+          style={{ background: ORANGE }}>
+          {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+        <button onClick={handleDiscard} disabled={saving}
+          className="px-6 py-2.5 rounded-xl text-sm font-semibold border border-[rgba(51,44,90,0.12)] text-[#7a6e8a] hover:bg-white transition-colors disabled:opacity-40">
+          Discard
+        </button>
       </div>
     </div>
   );

@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String    @id @default(uuid())
+  name       String    @db.VarChar(100)
+  phone      String    @unique @db.VarChar(15)
+  password   String
+  isVerified Boolean   @default(false)
+  otp        String?   @db.VarChar(6)
+  otpExpiry  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  business   Business?
+}
+
+model Category {
+  id         String     @id @default(uuid())
+  name       String     @unique @db.VarChar(100)
+  businesses Business[]
+  createdAt  DateTime   @default(now())
+}
+
+model Business {
+  id               String          @id @default(uuid())
+  userId           String          @unique
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String          @db.VarChar(200)
+  categoryId       String
+  category         Category        @relation(fields: [categoryId], references: [id])
+  description      String?         @db.Text
+  services         String[]
+  serviceableAreas String[]
+  address          String          @db.Text
+  landmark         String?         @db.VarChar(200)
+  city             String          @db.VarChar(100)
+  pincode          String          @db.VarChar(10)
+  images           BusinessImage[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model BusinessImage {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  url        String
+  createdAt  DateTime @default(now())
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique @db.VarChar(200)
+  password  String
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

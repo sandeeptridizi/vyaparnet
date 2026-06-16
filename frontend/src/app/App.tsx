@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Users, Package, IndianRupee, Tag, Megaphone, Settings,
   LayoutDashboard, Search, Bell, ChevronDown, TrendingUp,
@@ -14,6 +14,30 @@ const MENU_BG = "#332C5A";
 const ACCENT = "#3845AB";
 const ORANGE = "#EEA86C";
 const SCREEN_BG = "#FEF4EE";
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_API_BASE;
+const getToken = () => localStorage.getItem("vyapar_token");
+const setToken = (t: string) => localStorage.setItem("vyapar_token", t);
+const clearToken = () => localStorage.removeItem("vyapar_token");
+const authHeaders = (): Record<string, string> => ({
+  Authorization: `Bearer ${getToken()}`,
+  "Content-Type": "application/json",
+});
+
+type AppUser = {
+  id: number;
+  name: string;
+  phone: string;
+  status: string;
+  subscription: string;
+  is_verified: boolean;
+  joined: string;
+  listings: number;
+  business_name?: string;
+  city?: string;
+  category?: string;
+};
 
 
 const revenueData = [
@@ -440,25 +464,34 @@ function DashboardPage() {
 
 function UserManagementPage() {
   const [search, setSearch] = useState("");
-  const [usersData, setUsersData] = useState(users);
-  const [viewingUser, setViewingUser] = useState<typeof users[0] | null>(null);
-  const [editingUser, setEditingUser] = useState<typeof users[0] | null>(null);
-  const [editDraft, setEditDraft] = useState({ name: "", email: "", city: "", status: "", subscription: "" });
-  const [deletingUser, setDeletingUser] = useState<typeof users[0] | null>(null);
+  const [usersData, setUsersData] = useState<AppUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [viewingUser, setViewingUser] = useState<AppUser | null>(null);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [editDraft, setEditDraft] = useState({ status: "", subscription: "" });
+  const [deletingUser, setDeletingUser] = useState<AppUser | null>(null);
   const [addingUser, setAddingUser] = useState(false);
-  const [addDraft, setAddDraft] = useState({ name: "", email: "", city: "", status: "Active", subscription: "—" });
+  const [addDraft, setAddDraft] = useState({ name: "", phone: "", city: "", status: "Active" });
 
-  const filtered = usersData.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    u.city.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoadingUsers(true);
+      fetch(`${API_BASE}/admin/users?search=${encodeURIComponent(search)}&limit=50`, {
+        headers: authHeaders(),
+      })
+        .then(r => r.json())
+        .then(d => setUsersData(d.users ?? []))
+        .catch(console.error)
+        .finally(() => setLoadingUsers(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#1a1530]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>User Management</h1>
-          <p className="text-sm text-[#7a6e8a] mt-0.5">{users.length} registered users</p>
+          <p className="text-sm text-[#7a6e8a] mt-0.5">{usersData.length} registered users</p>
         </div>
         <button onClick={() => { setAddDraft({ name: "", email: "", city: "", status: "Active", subscription: "—" }); setAddingUser(true); }}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{ background: ORANGE }}>
@@ -468,9 +501,9 @@ function UserManagementPage() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Active Users", value: "1,12,040", icon: <UserCheck size={16} color={ACCENT} /> },
-          { label: "Suspended", value: "1,430", icon: <UserX size={16} color="#d4183d" /> },
-          { label: "Pending Verification", value: "980", icon: <AlertCircle size={16} color={ORANGE} /> },
+          { label: "Active Users", value: usersData.filter(u => u.status === "Active").length, icon: <UserCheck size={16} color={ACCENT} /> },
+          { label: "Suspended", value: usersData.filter(u => u.status === "Suspended").length, icon: <UserX size={16} color="#d4183d" /> },
+          { label: "Pending Verification", value: usersData.filter(u => u.status === "Pending").length, icon: <AlertCircle size={16} color={ORANGE} /> },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl p-4 border border-[rgba(51,44,90,0.08)] flex items-center gap-4">
             <div className="p-2.5 rounded-xl bg-[#F0F2FF]">{s.icon}</div>
@@ -502,7 +535,11 @@ function UserManagementPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
+              {loadingUsers ? (
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-[#7a6e8a]">Loading users…</td></tr>
+              ) : usersData.length === 0 ? (
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-[#7a6e8a]">No users found</td></tr>
+              ) : usersData.map(u => (
                 <tr key={u.id} className="border-t border-[rgba(51,44,90,0.05)] hover:bg-[#faf6f2] transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
@@ -510,28 +547,28 @@ function UserManagementPage() {
                         {u.name.split(" ").map(n => n[0]).join("")}
                       </div>
                       <div>
-                        <p className="font-semibold text-[#1a1530] whitespace-nowrap">{u.name}</p>
-                        <p className="text-xs text-[#7a6e8a]">{u.email}</p>
+                        <p className="font-semibold text-[#1a1530] whitespace-nowrap">{u.business_name || u.name}</p>
+                        <p className="text-xs text-[#7a6e8a]">{u.phone}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-1 text-[#7a6e8a]">
-                      <MapPin size={11} /><span className="text-xs">{u.city}</span>
+                      <MapPin size={11} /><span className="text-xs">{u.city || "—"}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5"><Badge status={u.status} /></td>
                   <td className="px-5 py-3.5 text-[#7a6e8a] text-xs whitespace-nowrap">{u.joined}</td>
                   <td className="px-5 py-3.5 font-medium text-[#1a1530]">{u.listings}</td>
                   <td className="px-5 py-3.5">
-                    {u.subscription !== "—" ? (
+                    {u.subscription !== "none" ? (
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: u.subscription === "Annual" ? "#F0F2FF" : "rgba(238,168,108,0.12)", color: u.subscription === "Annual" ? ACCENT : ORANGE }}>{u.subscription}</span>
                     ) : <span className="text-xs text-[#7a6e8a]">—</span>}
                   </td>
-                                    <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <button className="p-1.5 rounded-lg hover:bg-[#F0F2FF]" onClick={() => setViewingUser(u)}><Eye size={14} color={ACCENT} /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-[#F0F2FF]" onClick={() => { setEditingUser(u); setEditDraft({ name: u.name, email: u.email, city: u.city, status: u.status, subscription: u.subscription }); }}><Edit2 size={14} color={ACCENT} /></button>
+                      <button className="p-1.5 rounded-lg hover:bg-[#F0F2FF]" onClick={() => { setEditingUser(u); setEditDraft({ status: u.status, subscription: u.subscription }); }}><Edit2 size={14} color={ACCENT} /></button>
                       <button className="p-1.5 rounded-lg hover:bg-red-50" onClick={() => setDeletingUser(u)}><Trash2 size={14} color="#d4183d" /></button>
                     </div>
                   </td>
@@ -552,7 +589,7 @@ function UserManagementPage() {
             <div className="px-6 py-5 space-y-3">
               {[
                 { label: "Full Name", key: "name", type: "text", placeholder: "e.g. Ravi Kumar" },
-                { label: "Email", key: "email", type: "email", placeholder: "e.g. ravi@gmail.com" },
+                { label: "Phone Number", key: "phone", type: "tel", placeholder: "e.g. 9876543210" },
                 { label: "City", key: "city", type: "text", placeholder: "e.g. Pune" },
               ].map(f => (
                 <div key={f.key}>
@@ -569,19 +606,23 @@ function UserManagementPage() {
                   {["Active", "Suspended", "Pending"].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-sm font-medium text-[#1a1530] block mb-1.5">Subscription</label>
-                <select value={addDraft.subscription} onChange={e => setAddDraft(d => ({ ...d, subscription: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none">
-                  {["—", "Monthly", "Annual"].map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
             </div>
             <div className="px-6 pb-5 flex gap-3">
               <button onClick={() => setAddingUser(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] text-sm font-medium text-[#7a6e8a] hover:bg-[#f5ebe2]">Cancel</button>
-              <button disabled={!addDraft.name || !addDraft.email} onClick={() => {
-                const newUser = { id: Date.now(), name: addDraft.name, email: addDraft.email, city: addDraft.city, role: "Buyer", status: addDraft.status, joined: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }), listings: 0, spend: "—", subscription: addDraft.subscription };
-                setUsersData(prev => [newUser, ...prev]);
+              <button disabled={!addDraft.name || !addDraft.phone} onClick={async () => {
+                const res = await fetch(`${API_BASE}/app/auth/register`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: addDraft.name, phone: addDraft.phone, password: "Temp@1234" }),
+                });
+                const data = await res.json();
+                if (res.ok || res.status === 409) {
+                  const refresh = await fetch(`${API_BASE}/admin/users?limit=50`, { headers: authHeaders() });
+                  const d = await refresh.json();
+                  setUsersData(d.users ?? []);
+                } else {
+                  alert(data.error || "Failed to add user");
+                }
                 setAddingUser(false);
               }} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-40" style={{ background: ORANGE }}>
                 Add User
@@ -604,16 +645,17 @@ function UserManagementPage() {
                   {viewingUser.name.split(" ").map(n => n[0]).join("")}
                 </div>
                 <div>
-                  <p className="font-bold text-[#1a1530]">{viewingUser.name}</p>
-                  <p className="text-xs text-[#7a6e8a]">{viewingUser.email}</p>
+                  <p className="font-bold text-[#1a1530]">{viewingUser.business_name || viewingUser.name}</p>
+                  <p className="text-xs text-[#7a6e8a]">{viewingUser.phone}</p>
                 </div>
               </div>
               {[
-                { label: "City", value: viewingUser.city },
+                { label: "City", value: viewingUser.city || "—" },
+                { label: "Category", value: viewingUser.category || "—" },
                 { label: "Status", value: viewingUser.status },
                 { label: "Joined", value: viewingUser.joined },
                 { label: "Listings", value: String(viewingUser.listings) },
-                { label: "Subscription", value: viewingUser.subscription },
+                { label: "Subscription", value: viewingUser.subscription === "none" ? "—" : viewingUser.subscription },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between py-2 border-b border-[rgba(51,44,90,0.06)]">
                   <span className="text-xs text-[#7a6e8a]">{row.label}</span>
@@ -636,18 +678,6 @@ function UserManagementPage() {
               <button onClick={() => setEditingUser(null)} className="p-1.5 rounded-lg hover:bg-[rgba(51,44,90,0.06)]"><XCircle size={18} color="#7a6e8a" /></button>
             </div>
             <div className="px-6 py-5 space-y-3">
-              {[
-                { label: "Name", key: "name", type: "text" },
-                { label: "Email", key: "email", type: "email" },
-                { label: "City", key: "city", type: "text" },
-              ].map(f => (
-                <div key={f.key}>
-                  <label className="text-sm font-medium text-[#1a1530] block mb-1.5">{f.label}</label>
-                  <input type={f.type} value={editDraft[f.key as keyof typeof editDraft]}
-                    onChange={e => setEditDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                    className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none" />
-                </div>
-              ))}
               <div>
                 <label className="text-sm font-medium text-[#1a1530] block mb-1.5">Status</label>
                 <select value={editDraft.status} onChange={e => setEditDraft(d => ({ ...d, status: e.target.value }))}
@@ -659,15 +689,24 @@ function UserManagementPage() {
                 <label className="text-sm font-medium text-[#1a1530] block mb-1.5">Subscription</label>
                 <select value={editDraft.subscription} onChange={e => setEditDraft(d => ({ ...d, subscription: e.target.value }))}
                   className="w-full px-3 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] bg-[#f5ebe2] text-sm text-[#1a1530] outline-none">
-                  {["—", "Monthly", "Annual"].map(s => <option key={s}>{s}</option>)}
+                  {["none", "Monthly", "Annual"].map(s => <option key={s} value={s}>{s === "none" ? "— (None)" : s}</option>)}
                 </select>
               </div>
             </div>
             <div className="px-6 pb-5 flex gap-3">
               <button onClick={() => setEditingUser(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] text-sm font-medium text-[#7a6e8a] hover:bg-[#f5ebe2]">Cancel</button>
-              <button onClick={() => {
-                setUsersData(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...editDraft } : u));
-                setEditingUser(null);
+              <button onClick={async () => {
+                if (!editingUser) return;
+                const res = await fetch(`${API_BASE}/admin/users/${editingUser.id}`, {
+                  method: "PATCH",
+                  headers: authHeaders(),
+                  body: JSON.stringify(editDraft),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  setUsersData(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...data.user } : u));
+                  setEditingUser(null);
+                }
               }} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{ background: ORANGE }}>Save Changes</button>
             </div>
           </div>
@@ -686,9 +725,16 @@ function UserManagementPage() {
             </div>
             <div className="px-6 pb-5 flex gap-3">
               <button onClick={() => setDeletingUser(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-[rgba(51,44,90,0.15)] text-sm font-medium text-[#7a6e8a] hover:bg-[#f5ebe2]">Cancel</button>
-              <button onClick={() => {
-                setUsersData(prev => prev.filter(u => u.id !== deletingUser.id));
-                setDeletingUser(null);
+              <button onClick={async () => {
+                if (!deletingUser) return;
+                const res = await fetch(`${API_BASE}/admin/users/${deletingUser.id}`, {
+                  method: "DELETE",
+                  headers: authHeaders(),
+                });
+                if (res.ok) {
+                  setUsersData(prev => prev.filter(u => u.id !== deletingUser.id));
+                  setDeletingUser(null);
+                }
               }} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{ background: "#d4183d" }}>Delete</button>
             </div>
           </div>
@@ -1524,13 +1570,35 @@ const navItems = [
 ];
 
 
-function LoginPage({ onLogin }: { onLogin: () => void }) {
+function LoginPage({ onLogin }: { onLogin: (admin: { name: string; city: string }) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Login failed. Please check your credentials.");
+        return;
+      }
+      setToken(data.token);
+      onLogin(data.admin);
+    } catch {
+      setError("Network error. Is the backend server running?");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1571,8 +1639,11 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
                   </button>
                 </div>
               </div>
-              <button type="submit" className="w-full py-3 rounded-xl text-white font-semibold text-sm hover:opacity-90 transition-opacity mt-2" style={{ background: MENU_BG }}>
-                Sign In
+              {error && (
+                <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+              )}
+              <button type="submit" disabled={loading} className="w-full py-3 rounded-xl text-white font-semibold text-sm hover:opacity-90 transition-opacity mt-2 disabled:opacity-50" style={{ background: MENU_BG }}>
+                {loading ? "Signing in…" : "Sign In"}
               </button>
             </form>
           </div>
@@ -1583,12 +1654,23 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(() => !!getToken());
+  const [adminInfo, setAdminInfo] = useState<{ name: string; city: string } | null>(null);
   const [active, setActive] = useState("dashboard");
   const [financialOpen, setFinancialOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  if (!loggedIn) return <LoginPage onLogin={() => setLoggedIn(true)} />;
+  useEffect(() => {
+    if (!getToken()) return;
+    fetch(`${API_BASE}/admin/auth/me`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setAdminInfo(d.admin))
+      .catch(() => { clearToken(); setLoggedIn(false); });
+  }, []);
+
+  const handleLogout = () => { clearToken(); setLoggedIn(false); setAdminInfo(null); };
+
+  if (!loggedIn) return <LoginPage onLogin={(admin) => { setAdminInfo(admin); setLoggedIn(true); }} />;
 
   const financialSub = active.startsWith("financial-") ? active.replace("financial-", "") : "dashboard";
   const isFinancialActive = active.startsWith("financial-");
@@ -1648,14 +1730,16 @@ export default function App() {
 
         <div className="p-3 border-t border-white/10">
           <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: ORANGE }}>JK</div>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: ORANGE }}>
+              {adminInfo?.name.split(" ").map(n => n[0]).join("") ?? "A"}
+            </div>
             {sidebarOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-semibold truncate">John Korlapati</p>
-                <p className="text-white/40 text-xs truncate">Hyderabad</p>
+                <p className="text-white text-sm font-semibold truncate">{adminInfo?.name ?? "Admin"}</p>
+                <p className="text-white/40 text-xs truncate">{adminInfo?.city ?? ""}</p>
               </div>
             )}
-            {sidebarOpen && <LogOut size={15} color="rgba(255,255,255,0.4)" className="cursor-pointer shrink-0" onClick={() => setLoggedIn(false)} />}
+            {sidebarOpen && <LogOut size={15} color="rgba(255,255,255,0.4)" className="cursor-pointer shrink-0" onClick={handleLogout} />}
           </div>
         </div>
       </aside>
@@ -1670,10 +1754,12 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right mr-1 hidden sm:block">
-              <p className="text-xs font-semibold text-[#1a1530]">John Korlapati</p>
-              <p className="text-xs text-[#7a6e8a]">Hyderabad, India</p>
+              <p className="text-xs font-semibold text-[#1a1530]">{adminInfo?.name ?? "Admin"}</p>
+              <p className="text-xs text-[#7a6e8a]">{adminInfo?.city ? `${adminInfo.city}, India` : ""}</p>
             </div>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: ACCENT }}>JK</div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: ACCENT }}>
+              {adminInfo?.name.split(" ").map(n => n[0]).join("") ?? "A"}
+            </div>
           </div>
         </header>
 
